@@ -1,0 +1,25 @@
+funds:
+  berry_street:
+    description: "Example profile for Berry Street Enhanced Master Fund Ltd"
+    source:
+      sheet: "Exposure"
+      range: "B14:H29"  # adjust to the actual data rectangle in the raw Excel
+      stop_at_blank_rows: 2
+    target:
+      sheet: "Exposure_Input"  # target sheet name in your template workbook
+      start_cell: "B6"          # top-left corner of the yellow input block
+      clear_rows: 25            # optional clearing of the target block
+      clear_cols: 7
+  generic_table:
+    description: "Fallback: read from a start cell until blank rows"
+    source:
+      sheet: "Sheet1"
+      start_cell: "A1"
+      max_rows: 100
+      max_cols: 10
+      stop_at_blank_rows: 1
+    target:
+      sheet: "Exposure_Input"
+      start_cell: "B6"
+      clear_rows: 100
+      clear_cols: 10
