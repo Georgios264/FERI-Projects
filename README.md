@@ -6,11 +6,12 @@ re-run monthly without manually selecting and pasting ranges.
 
 ## How it works
 - YAML profiles (`config/fund_profiles.yaml`) describe how to locate the exposure table in a
-  raw workbook and where to paste it into the template.
+  raw workbook and where to paste it into the template. Each profile must specify **either**
+  a fixed `range` **or** a `start_cell` with bounds, not both.
 - The script reads only cell values (no formatting) and can clear the target block before
   writing new values.
 - Supports fixed ranges (e.g., `B14:H29`) or dynamic reading from a start cell with a
-  configurable maximum size.
+  configurable maximum size. Trailing blank rows/columns are trimmed automatically.
 
 ## Quickstart
 1. Install dependencies:
@@ -38,6 +39,9 @@ re-run monthly without manually selecting and pasting ranges.
        --fund berry_street \
        --output /path/to/output.xlsx
    ```
+   - Add `--dry-run` to preview the detected table (first 5 rows, row/column counts) without
+     writing a file. Useful for testing a new fund layout.
+   - Use `--list-funds` to show all configured profiles and exit.
 4. Open the generated `output.xlsx` and run your existing VBA macro or Selenium uploader.
 
 ## Config tips

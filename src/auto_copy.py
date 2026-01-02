@@ -69,6 +69,17 @@ class ProfileRegistry:
             except KeyError as exc:
                 raise ConfigError(f"Profile '{key}' is missing required section: {exc}") from exc
 
+            has_range = bool(source_cfg.get("range"))
+            has_start = bool(source_cfg.get("start_cell"))
+            if has_range and has_start:
+                raise ConfigError(
+                    f"Profile '{key}' should define either 'range' or 'start_cell', not both"
+                )
+            if not has_range and not has_start:
+                raise ConfigError(
+                    f"Profile '{key}' must define either 'range' or 'start_cell' in source config"
+                )
+
             profile = FundProfile(
                 name=key,
                 source=SourceConfig(
@@ -117,6 +128,23 @@ def _strip_blank_rows(rows: List[List[object]], allowed_consecutive: int) -> Lis
     return cleaned
 
 
+def _trim_blank_cols(rows: List[List[object]]) -> List[List[object]]:
+    if not rows:
+        return rows
+
+    last_non_blank_idx = -1
+    for row in rows:
+        for idx, cell in enumerate(row):
+            if cell not in (None, ""):
+                last_non_blank_idx = max(last_non_blank_idx, idx)
+
+    if last_non_blank_idx == -1:
+        return []
+
+    trim_to = last_non_blank_idx + 1
+    return [row[:trim_to] for row in rows]
+
+
 def _read_range(ws, range_str: str) -> List[List[object]]:
     return [[cell.value for cell in row] for row in ws[range_str]]
 
@@ -148,33 +176,36 @@ def _clear_block(ws, start_cell: str, rows: int, cols: int) -> None:
             ws.cell(row=start.row + r, column=start.column + c, value=None)
 
 
-def copy_exposure(raw_path: Path, template_path: Path, output_path: Path, profile: FundProfile) -> None:
+def _load_table(raw_path: Path, profile: FundProfile) -> List[List[object]]:
     raw_wb = openpyxl.load_workbook(raw_path, data_only=True)
-    template_wb = openpyxl.load_workbook(template_path)
-
     try:
         raw_ws = raw_wb[profile.source.sheet]
     except KeyError as exc:
         raise ConfigError(f"Sheet '{profile.source.sheet}' not found in raw file") from exc
 
-    try:
-        target_ws = template_wb[profile.target.sheet]
-    except KeyError as exc:
-        raise ConfigError(f"Sheet '{profile.target.sheet}' not found in template") from exc
-
     if profile.source.range:
         table = _read_range(raw_ws, profile.source.range)
-    elif profile.source.start_cell:
+    else:
         table = _read_dynamic(
             raw_ws,
             profile.source.start_cell,
             profile.source.max_rows,
             profile.source.max_cols,
         )
-    else:
-        raise ConfigError("Source config must define either 'range' or 'start_cell'")
 
     table = _strip_blank_rows(table, profile.source.stop_at_blank_rows)
+    table = _trim_blank_cols(table)
+    return table
+
+
+def copy_exposure(raw_path: Path, template_path: Path, output_path: Path, profile: FundProfile) -> None:
+    table = _load_table(raw_path, profile)
+    template_wb = openpyxl.load_workbook(template_path)
+
+    try:
+        target_ws = template_wb[profile.target.sheet]
+    except KeyError as exc:
+        raise ConfigError(f"Sheet '{profile.target.sheet}' not found in template") from exc
 
     _clear_block(
         target_ws,
@@ -194,6 +225,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fund", required=True, help="Fund profile name to use")
     parser.add_argument("--config", default=Path("config/fund_profiles.yaml"), type=Path, help="YAML config path")
     parser.add_argument("--output", required=True, type=Path, help="Where to write the populated template")
+    parser.add_argument(
+        "--list-funds",
+        action="store_true",
+        help="List available fund profiles from the config and exit",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Parse and preview the table without writing the output file",
+    )
     return parser
 
 
@@ -202,8 +243,25 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     registry = ProfileRegistry(args.config)
+
+    if args.list_funds:
+        for name in sorted(registry.available):
+            print(name)
+        return 0
+
     profile = registry.get(args.fund)
 
+    table = _load_table(args.raw, profile)
+
+    if args.dry_run:
+        preview_rows = table[:5]
+        print(f"Fund: {profile.name}")
+        print(f"Rows: {len(table)} | Cols: {len(preview_rows[0]) if preview_rows else 0}")
+        for row in preview_rows:
+            print(row)
+        return 0
+
+    # Reuse copy_exposure for the actual write path to keep clearing/target logic centralized.
     copy_exposure(args.raw, args.template, args.output, profile)
     print(f"Copied exposure for {profile.name} -> {args.output}")
     return 0
