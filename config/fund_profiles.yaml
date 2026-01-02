@@ -10,6 +10,8 @@ funds:
       start_cell: "B6"          # top-left corner of the yellow input block
       clear_rows: 25            # optional clearing of the target block
       clear_cols: 7
+      number_format: "0.0%"     # display pasted values as percentages
+      select_range: true        # pre-select the pasted block for the macro
   generic_table:
     description: "Fallback: read from a start cell until blank rows"
     source:

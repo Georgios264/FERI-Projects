@@ -10,6 +10,8 @@ re-run monthly without manually selecting and pasting ranges.
   a fixed `range` **or** a `start_cell` with bounds, not both.
 - The script reads only cell values (no formatting) and can clear the target block before
   writing new values.
+- Optional number formatting can be applied to the pasted block (e.g., `0.0%`) and the
+  pasted area can be pre-selected for your VBA macro when the workbook is opened.
 - Supports fixed ranges (e.g., `B14:H29`) or dynamic reading from a start cell with a
   configurable maximum size. Trailing blank rows/columns are trimmed automatically.
 
@@ -25,12 +27,14 @@ re-run monthly without manually selecting and pasting ranges.
        source:
          sheet: "Exposure"      # sheet in the raw file
          range: "B14:H29"       # rectangle that holds the exposure table
-       target:
-         sheet: "Exposure_Input" # sheet in your template
-         start_cell: "B6"        # top-left cell of the yellow input block
-         clear_rows: 25
-         clear_cols: 7
-   ```
+      target:
+        sheet: "Exposure_Input" # sheet in your template
+        start_cell: "B6"        # top-left cell of the yellow input block
+        clear_rows: 25
+        clear_cols: 7
+        number_format: "0.0%"   # optional: display pasted numbers as percentages
+        select_range: true      # optional: pre-select the pasted block for the VBA macro
+  ```
 3. Run the copier:
    ```bash
    python src/auto_copy.py \
@@ -48,6 +52,10 @@ re-run monthly without manually selecting and pasting ranges.
 - Use `range` for layouts that never change; use `start_cell`+`stop_at_blank_rows` for tables
   that vary in length.
 - Set `clear_rows`/`clear_cols` to wipe previous data in the template block before writing.
+- Use `number_format` to enforce percentage display (e.g., `0.00%`) or other numeric formats
+  without changing the underlying values.
+- Enable `select_range` to pre-highlight the pasted block, making it easy to hit your macro
+  without manual selection.
 - Add more funds under the `funds:` key; each name becomes the `--fund` argument.
 
 ## Notes
